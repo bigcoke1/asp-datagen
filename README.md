@@ -43,6 +43,28 @@ label.py       two teachers, k samples each       sees only the bundle; 0-10, 10
 - **Small teachers:** 7B-12B models are what fit a 16 GB laptop. The generation page expects larger open-weight models on a GPU. Label quality is bounded by that.
 - **Superseded parts of the generation page are skipped:** the planted-vulnerability gates and the LLM judge (§5) were built for the report writer, which the design no longer has.
 
+## Pilot 1 (2026-09-24): 20 bundles, identity + containment
+
+The mechanics work, but the labels are not good enough to train on.
+
+- **Schema:** all 20 bundles pass the Evidence Bundle Schema.
+- **Contexts:** A×7, B×1, C×5, D×4, E×3; 3 of the 20 are gateway-fronted.
+- **Coverage:** `containment` was `INSUFFICIENT_EVIDENCE` on 8 of 20, mostly pack 14's blind `permissions`. `identity` was evaluable on all 20.
+- **Containment is directional but compressed:**
+  - `qwen2.5:7b` gives bundles where host-level reach is visible (privileged, Docker socket or host `/`) a mean of 3.0, against 6.3 for the rest.
+  - `mistral-nemo` gives 6.7 against 8.0. It scored a privileged container running as root 5-7, while the rubric anchor for that case is 1.
+  - The two teachers agreed exactly on 0 of 12 bundles and within 1 point on 2 of 12.
+- **Identity is noise:**
+  - Neither teacher scores a baked plaintext credential lower: qwen 8.0 with one visible against 5.9 without, nemo 7.4 against 7.8.
+  - qwen's lowest scores (2) all fall on context-A bundles. Its reasons treat an `ABSENT` credential inventory, meaning the agent holds no credentials, as dangerous.
+  - Medians cluster at 7-8, so the classes balance evenly in the facts but not in the labels.
+- **Teachers invent facts:** qwen cited "privileged mode" on a bundle that is not privileged.
+- **Surface realism is weak:** for example, model name `bard-llm-v1`, and destinations that are not hostnames (`hr-interview-scheduling`).
+
+**What this points to:**
+- **Teachers:** stronger open-weight teachers (the generation page's larger Qwen, DeepSeek or Kimi on a GPU), measured against a small human-labelled set before any are used at scale.
+- **Consistency gate:** the deterministic gate from generation page §5 could return as a check, rejecting a label that contradicts a visible fact the rubric anchors (for example, privileged + root must score ≤ 2 on containment).
+
 ## Run
 
 ```bash
