@@ -12,6 +12,10 @@ TEACHERS = {
     "qwen2.5:7b": "Apache-2.0, Alibaba Qwen",
     "mistral-nemo": "Apache-2.0, Mistral AI / NVIDIA",
 }
+# Larger teachers tried against the same bundles (datagen.relabel). 14B is the ceiling on a 16 GB Mac.
+LARGER = {
+    "qwen3:14b": "Apache-2.0, Alibaba Qwen",
+}
 
 
 def chat(model: str, system: str, user: str, schema: dict, temperature: float, seed: int | None = None) -> dict:
@@ -23,6 +27,8 @@ def chat(model: str, system: str, user: str, schema: dict, temperature: float, s
         "stream": False,
         "options": {"temperature": temperature, "num_ctx": 8192, **({"seed": seed} if seed is not None else {})},
     }
+    if model.startswith("qwen3"):
+        body["think"] = False  # thinking multiplies the output several times over; off for throughput
     req = urllib.request.Request(OLLAMA, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=600) as r:
         content = json.loads(r.read())["message"]["content"]

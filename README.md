@@ -65,6 +65,22 @@ The mechanics work, but the labels are not good enough to train on.
 - **Teachers:** stronger open-weight teachers (the generation page's larger Qwen, DeepSeek or Kimi on a GPU), measured against a small human-labelled set before any are used at scale.
 - **Consistency gate:** the deterministic gate from generation page §5 could return as a check, rejecting a label that contradicts a visible fact the rubric anchors (for example, privileged + root must score ≤ 2 on containment).
 
+### Pilot 1b: a larger teacher on the same 20 bundles
+
+`qwen3:14b` (Apache-2.0, thinking off) relabelled the same bundles. This is the largest size that fits on a 16 GB M3 MacBook Air: 10 GB, fully on the GPU, about 90 s per bundle. `python -m datagen.check` compares all three teachers:
+
+| check | mistral-nemo | qwen2.5:7b | qwen3:14b |
+|---|---|---|---|
+| containment: host reach shown vs not | 6.7 vs 8.0 | 3.0 vs 6.3 | **3.3 vs 7.8** |
+| containment: privileged + root scored ≤ 2 | 0/2 | 2/2 | 1/2 |
+| identity: baked secret shown vs not | 7.4 vs 7.8 | 8.0 vs 5.9 | 8.2 vs 8.0 |
+| identity: no credentials vs some | 8.0 vs 7.6 | 3.8 vs 7.1 | **9.2 vs 7.8** |
+| spread across a teacher's own samples | 1.53 | 1.53 | **0.47** |
+
+- **Containment works:** qwen3:14b separates visible host reach most widely of the three and is the most self-consistent.
+- **Identity still fails on baked secrets:** qwen3:14b stopped treating "no credentials" as dangerous, but still misreads what "baked" means. On one bundle it wrote "its credentials are baked i[nto the image] … securely managed". The input contract (Part 5.5) says the opposite: a baked credential is exposed to anyone who can pull the image and is unrotatable in practice. A category guide that defines the term may fix this; not yet tried.
+- **Throughput:** at about 90 s per bundle, a corpus of thousands is days of fanless laptop time, fine for pilots only.
+
 ## Run
 
 ```bash
