@@ -16,7 +16,7 @@ assemble.py    facts + surface → bundle           statuses from the input cont
      ▼
 validate.py    Evidence Bundle Schema             JSON Schema (Draft 2020-12) + Rule 5 + all 26 attributes
      ▼
-label.py       two teachers, k samples each       sees only the bundle; 0-10, 10 safest; coverage-gated
+label.py       open-weight teachers, k samples    sees only the bundle; 0-10, 10 safest; coverage-gated
 ```
 
 ## Rules it follows, and where each comes from
@@ -24,13 +24,128 @@ label.py       two teachers, k samples each       sees only the bundle; 0-10, 10
 | Rule | Source | How |
 |---|---|---|
 | Never name the risk level when generating | Generation page §1 | Code samples facts evenly across their values. The teacher is told only the domain, job, harness and counts, and `generate.guard` refuses any prompt that contains a risk word. |
-| Class balance | Generation page §7 | Balance comes from how facts are sampled, not from labels. Check the histograms in `data/summary.md`. |
-| Open-weight teachers, two of them, mixed | Generation page §3, design doc | `qwen2.5:7b` and `mistral-nemo`, both Apache-2.0, served locally by Ollama. Generation mixes them 70/30. Both label every bundle. |
+| Class balance | Generation page §7 | Balance comes from how facts are sampled, not from labels. It does not survive labelling yet (see Results). |
+| Open-weight teachers, two of them, mixed | Generation page §3, design doc | `qwen2.5:7b` and `mistral-nemo`, both Apache-2.0, served locally by Ollama. Generation mixes them 70/30. Both label every bundle. `qwen3:14b` was tried as a larger labeller. |
 | Generate blindness, not just configuration | Generation page (update), design doc | Each attribute's status follows the input contract's matrix for contexts A-E, plus the gateway-fronted modifier and the rule pack's gaps. |
 | Closed enums only | Evidence Bundle Schema page | Every bundle is validated against `schema/evidence-bundle.schema.json`, which is the page's schema as copied into Rail Center's test vectors. |
 | Blind labelling | Generation page §1 | The labeller sees the bundle and nothing else. The scenario is kept in `data/scenarios.jsonl` for audit. |
 | A category with blind required inputs is not scored | Design doc §4 (coverage profiler) | These get `INSUFFICIENT_EVIDENCE`, and the teacher is not asked. |
 | 0-10 scale, 10 safest | Design doc | The rubric is the prototype's `STATES` + `SCALE_V2`. |
+
+## Who wrote what in a bundle
+
+This matters for the design doc's rule that training data may not come from a commercial model.
+
+| Part of the bundle | Written by |
+|---|---|
+| Every fact that bears on risk (user, privileged, caps, root filesystem, mounts, credential class and provenance, deleted-layer secrets, approval gate, network policy, tool count, exec and wildcard tools), and every `status`, `reason`, `tier` and `authored_by` | Python in this repo, seeded random sampling (`scenarios.py`, `assemble.py`) |
+| Fixed text strings: every `method` and `note`, mount paths, credential shapes, provider URLs, the harness fingerprint, and the domain and job list | Hard-coded in `assemble.py` and `scenarios.py`. These were written with Claude while building the pipeline. They are templates, not generated per bundle, but they appear in every bundle; check them with legal, or rewrite them, before training on this data. |
+| Surface: agent name, workdir, data directory, model name, tool names, credential variable names, hostnames, skill names and descriptions, MCP server names, deployment and namespace | An open-weight teacher, per bundle (`generate.py`): 15 by `qwen2.5:7b`, 5 by `mistral-nemo` |
+| Every label (score, reason, distribution) | Open-weight teachers only (`label.py`) |
+
+## Results (pilot, 2026-09-24)
+
+**The pipeline works; the labels are not yet good enough to train on.**
+- **Bundles:** all 20 are schema-valid, with realistic blindness.
+- **Containment:** the larger teacher, `qwen3:14b`, is close to usable.
+- **Identity:** every teacher tried gets it wrong. The clearest failure: they treat a credential baked into the image as safe.
+
+### Setup
+
+- **Batch:** 20 bundles, seed 20260924.
+- **Contexts:** A×7, B×1, C×5, D×4, E×3. 3 bundles are gateway-fronted.
+- **Categories:** `identity` and `containment`.
+- **Labelling:** each teacher scored each category 3 times at temperature 0.7. The tables show the median.
+- **Teachers:**
+  - `qwen2.5:7b` and `mistral-nemo` labelled in the main run, as the two-teacher mix (`data/labels.jsonl`).
+  - `qwen3:14b` relabelled the same bundles afterwards, so it compares on identical input (`data/labels.qwen3-14b.jsonl`).
+
+**Coverage:**
+- `identity` was evaluable on all 20.
+- `containment` was `INSUFFICIENT_EVIDENCE` on 8 of 20. Seven of those are pack 14's blind `permissions`, and one is context B, where mounts are blind too.
+
+### Do the labels follow the facts?
+
+The check compares bundles where a fact is visible to the labeller with bundles where it isn't. A gap in the right direction shows a teacher reads the fact; it doesn't show the scores are right. Reproduce with `python -m datagen.check`.
+
+| check | mistral-nemo | qwen2.5:7b | qwen3:14b |
+|---|---|---|---|
+| containment: host reach visible vs not (should be much lower) | 6.7 vs 8.0 | 3.0 vs 6.3 | **3.3 vs 7.8** |
+| containment: privileged + root scored ≤ 2 (the rubric anchor is 1) | 0/2 | 2/2 | 1/2 |
+| identity: a baked credential visible vs not (should be lower) | 7.4 vs 7.8 ✗ | 8.0 vs 5.9 ✗ | 8.2 vs 8.0 ✗ |
+| identity: no credentials vs some (should be higher) | 8.0 vs 7.6 | 3.8 vs 7.1 ✗ | **9.2 vs 7.8** |
+| spread across a teacher's own 3 samples | 1.53 | 1.53 | **0.47** |
+
+Host reach means privileged, a Docker socket mount, or the host's `/` mounted.
+
+How often two teachers' medians land within 1 point of each other:
+
+| pair | identity | containment |
+|---|---|---|
+| qwen2.5:7b ~ mistral-nemo | 15/20 | 2/12 |
+| qwen2.5:7b ~ qwen3:14b | 12/20 | 7/12 |
+| mistral-nemo ~ qwen3:14b | 14/20 | 7/12 |
+
+### Per bundle
+
+The middle column is what the bundle showed the labeller, built from the scenario but only where the carrying attribute was `ANSWERED` or `PARTIAL`. Bold marks the facts a reviewer would expect to pull a score down. A dash means `INSUFFICIENT_EVIDENCE`, so the teacher was not asked.
+
+| # | ctx | what the labeller could see | identity (7b / nemo / 14b) | containment (7b / nemo / 14b) |
+|---|---|---|---|---|
+| 0000 | C | non-root; permissions blind; no host mounts; no credentials | 8 / 9 / 9 | — / — / — |
+| 0001 | A | non-root; not privileged; no host mounts; no credentials | 2 / 9 / 9 | 7 / 9 / 9 |
+| 0002 | C | gateway-fronted; root; permissions blind; mounts **host etc**, **host root**; gateway credential only | 8 / 7 / 7 | — / — / — |
+| 0003 | C | non-root; permissions blind; mounts **docker socket**; 4 credentials, **1 baked** | 8 / 7 / 9 | — / — / — |
+| 0004 | A | root; not privileged; mounts **docker socket**; 4 credentials, provenance blind | 8 / 8 / 6 | 3 / 6 / 2 |
+| 0005 | D | non-root; not privileged; no mounts; 2 credentials, **2 baked** | 8 / 8 / 9 | 7 / 8 / 8 |
+| 0006 | A | non-root; not privileged; no host mounts; no credentials | 2 / 7 / 9 | 6 / 7 / 7 |
+| 0007 | E | gateway-fronted; root; not privileged; mounts **host root**; gateway credential only | 8 / 8 / 8 | 6 / 8 / 6 |
+| 0008 | E | non-root; permissions blind; no host mounts; 4 credentials, **2 baked** | 8 / 7 / 9 | — / — / — |
+| 0009 | A | root; **privileged**; no mounts; 1 credential, provenance blind | 2 / 7 / 6 | 0 / 6 / 3 |
+| 0010 | E | gateway-fronted; non-root; not privileged; no mounts; gateway credential only | 8 / 8 / 9 | 6 / 8 / 7 |
+| 0011 | D | non-root; not privileged; mounts **host root**; 4 credentials, none baked | 8 / 7 / 9 | 6 / 8 / 7 |
+| 0012 | D | root; not privileged; no host mounts; 4 credentials, none baked | 8 / 9 / 9 | 6 / 8 / 8 |
+| 0013 | D | root; **privileged**; mounts **docker socket**, **host root**; 3 credentials, **2 baked** | 8 / 7 / 6 | 0 / 5 / 1 |
+| 0014 | A | root; permissions blind; mounts **host root**; 4 credentials, provenance blind | 2 / 7 / 6 | — / — / — |
+| 0015 | C | non-root; **privileged**; mounts **docker socket**; 3 credentials, **1 baked** | 8 / 8 / 8 | 3 / 7 / 1 |
+| 0016 | A | non-root; permissions blind; mounts **docker socket**; 1 credential, provenance blind | 6 / 7 / 8 | — / — / — |
+| 0017 | C | non-root; not privileged; no host mounts; no credentials | 3 / 7 / 10 | 6 / 8 / 8 |
+| 0018 | B | non-root; permissions blind; mounts blind; 3 credentials, none baked | 9 / 9 / 8 | — / — / — |
+| 0019 | A | non-root; permissions blind; mounts **docker socket**, **host etc**; 4 credentials, provenance blind | 7 / 8 / 7 | — / — / — |
+
+### What went wrong, by teacher and category
+
+**Containment:**
+- **qwen3:14b is close to usable.**
+  - It scored 1 on the two worst bundles: 0013 (privileged, root, Docker socket and host `/`) and 0015 (privileged, Docker socket).
+  - It scored 7–9 on bundles with no host reach.
+  - Its three samples rarely differ.
+  - Its miss is 0009: privileged and root with no mounts, which it scored 3 against an anchor of 1. Host `/` mounted read-write is arguably scored too leniently: 6 as root (0007) and 7 as non-root (0011).
+- **qwen2.5:7b** points the right way but scatters. It also cited "privileged mode" on 0011, which is not privileged.
+- **mistral-nemo** compresses everything into 5–9, including 5 for 0013.
+
+**Identity:**
+- **No teacher reads a baked credential as a problem.** On 0008, qwen3:14b wrote that the credentials are "baked i[nto the image] … securely managed". The input contract (Part 5.5) says the opposite: a baked credential is readable by anyone who can pull the image and is unrotatable in practice. It is also the condition of the `baked_secret` hard cap.
+- **qwen2.5:7b** scores every agent holding no credentials 2–3 (0001, 0006, 0017): its reasons treat an `ABSENT` credential inventory as dangerous.
+- **Medians cluster at 7–9.** The facts are balanced; the labels are not.
+
+**Across both categories:**
+- **The generator's surface text is weak in places:** a model named `bard-llm-v1`, and destinations that are not hostnames (`hr-interview-scheduling`).
+
+### Hardware
+
+- **Machine:** a MacBook Air, M3, 16 GB. macOS gives the GPU roughly 10–12 GB of that.
+- **Ceiling:** about 14B parameters at 4-bit. `qwen3:14b` loads at 10 GB, entirely on the GPU.
+- **Speed:** about 56 s for the first call on a bundle, then about 6 s per call once the bundle is cached. That comes to about 90 s per bundle for 2 categories × 3 samples.
+- **What that allows:** fine for pilots. A corpus of thousands of bundles would take days on a fanless laptop that throttles.
+- **What doesn't fit:** the larger teachers the generation page names (big Qwen, DeepSeek, Kimi K2) need a GPU machine.
+
+### Next steps
+
+1. **Fix identity's vocabulary:** add what "baked" means (input contract Part 5.5) to the `identity` guide, then relabel identity with `qwen3:14b`. About 10 minutes.
+2. **Replace mistral-nemo as the second teacher.** The mix needs a different model family of similar strength; `phi4` (14B, MIT) fits the laptop.
+3. **Label 20 bundles by hand** and measure each teacher against them before scaling. The generation page's human seed set and protected holdout are still the only signal that is not circular.
+4. **Add a consistency gate:** reject a label that contradicts a visible fact the rubric anchors, for example privileged + root must score ≤ 2 on containment. This is generation page §5's deterministic gate, repurposed.
 
 ## Assumptions and departures, to review
 
@@ -40,56 +155,20 @@ label.py       two teachers, k samples each       sees only the bundle; 0-10, 10
 - **No harvest yet.** The updated generation page puts harvesting real configurations first, with generation filling the gaps. This pilot only generates.
 - **No human pass yet.** No human has edited drafts or labelled a held-out set. Treat every label here as an unreviewed teacher label.
 - **Mitigations are not generated.** The design doc says mitigation targets come from the catalogue, not from a teacher.
-- **Small teachers:** 7B-12B models are what fit a 16 GB laptop. The generation page expects larger open-weight models on a GPU. Label quality is bounded by that.
+- **Laptop-sized teachers:** 7B-14B models, which is what fits a 16 GB Mac (see Hardware).
 - **Superseded parts of the generation page are skipped:** the planted-vulnerability gates and the LLM judge (§5) were built for the report writer, which the design no longer has.
-
-## Pilot 1 (2026-09-24): 20 bundles, identity + containment
-
-The mechanics work, but the labels are not good enough to train on.
-
-- **Schema:** all 20 bundles pass the Evidence Bundle Schema.
-- **Contexts:** A×7, B×1, C×5, D×4, E×3; 3 of the 20 are gateway-fronted.
-- **Coverage:** `containment` was `INSUFFICIENT_EVIDENCE` on 8 of 20, mostly pack 14's blind `permissions`. `identity` was evaluable on all 20.
-- **Containment is directional but compressed:**
-  - `qwen2.5:7b` gives bundles where host-level reach is visible (privileged, Docker socket or host `/`) a mean of 3.0, against 6.3 for the rest.
-  - `mistral-nemo` gives 6.7 against 8.0. It scored a privileged container running as root 5-7, while the rubric anchor for that case is 1.
-  - The two teachers agreed exactly on 0 of 12 bundles and within 1 point on 2 of 12.
-- **Identity is noise:**
-  - Neither teacher scores a baked plaintext credential lower: qwen 8.0 with one visible against 5.9 without, nemo 7.4 against 7.8.
-  - qwen's lowest scores (2) all fall on context-A bundles. Its reasons treat an `ABSENT` credential inventory, meaning the agent holds no credentials, as dangerous.
-  - Medians cluster at 7-8, so the classes balance evenly in the facts but not in the labels.
-- **Teachers invent facts:** qwen cited "privileged mode" on a bundle that is not privileged.
-- **Surface realism is weak:** for example, model name `bard-llm-v1`, and destinations that are not hostnames (`hr-interview-scheduling`).
-
-**What this points to:**
-- **Teachers:** stronger open-weight teachers (the generation page's larger Qwen, DeepSeek or Kimi on a GPU), measured against a small human-labelled set before any are used at scale.
-- **Consistency gate:** the deterministic gate from generation page §5 could return as a check, rejecting a label that contradicts a visible fact the rubric anchors (for example, privileged + root must score ≤ 2 on containment).
-
-### Pilot 1b: a larger teacher on the same 20 bundles
-
-`qwen3:14b` (Apache-2.0, thinking off) relabelled the same bundles. This is the largest size that fits on a 16 GB M3 MacBook Air: 10 GB, fully on the GPU, about 90 s per bundle. `python -m datagen.check` compares all three teachers:
-
-| check | mistral-nemo | qwen2.5:7b | qwen3:14b |
-|---|---|---|---|
-| containment: host reach shown vs not | 6.7 vs 8.0 | 3.0 vs 6.3 | **3.3 vs 7.8** |
-| containment: privileged + root scored ≤ 2 | 0/2 | 2/2 | 1/2 |
-| identity: baked secret shown vs not | 7.4 vs 7.8 | 8.0 vs 5.9 | 8.2 vs 8.0 |
-| identity: no credentials vs some | 8.0 vs 7.6 | 3.8 vs 7.1 | **9.2 vs 7.8** |
-| spread across a teacher's own samples | 1.53 | 1.53 | **0.47** |
-
-- **Containment works:** qwen3:14b separates visible host reach most widely of the three and is the most self-consistent.
-- **Identity still fails on baked secrets:** qwen3:14b stopped treating "no credentials" as dangerous, but still misreads what "baked" means. On one bundle it wrote "its credentials are baked i[nto the image] … securely managed". The input contract (Part 5.5) says the opposite: a baked credential is exposed to anyone who can pull the image and is unrotatable in practice. A category guide that defines the term may fix this; not yet tried.
-- **Throughput:** at about 90 s per bundle, a corpus of thousands is days of fanless laptop time, fine for pilots only.
 
 ## Run
 
 ```bash
-ollama serve &                       # models: qwen2.5:7b, mistral-nemo
+ollama serve &                       # models: qwen2.5:7b, mistral-nemo, qwen3:14b
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m datagen.run --n 20 --categories identity containment
+.venv/bin/python -m datagen.run --n 20 --categories identity containment   # generate + label with the two-teacher mix
+.venv/bin/python -m datagen.relabel --teacher qwen3:14b                    # label the same bundles with another teacher
+.venv/bin/python -m datagen.check                                          # do the labels follow the facts?
 ```
 
-A rerun with the same `--seed` and `--out` resumes where it stopped. Each bundle takes about 2 minutes on an M3 with 16 GB: one generation call plus 3 samples × 2 teachers × 2 categories.
+A rerun with the same `--seed` and `--out` resumes where it stopped, as does `relabel`. `run` takes about 2–4 minutes per bundle on an M3 with 16 GB: one generation call plus 3 samples × 2 teachers × 2 categories.
 
 ## Output (`data/`)
 
@@ -97,5 +176,6 @@ A rerun with the same `--seed` and `--out` resumes where it stopped. Each bundle
 |---|---|
 | `bundles/*.json` | The generated evidence bundles. |
 | `scenarios.jsonl` | Per bundle: the sampled facts, the teacher's surface, which teacher generated it, and any schema problems. Keep it away from labellers. |
-| `labels.jsonl` | Per bundle × category × teacher: every sample (score + reason), a distribution over 0-10 (the soft target), the median, or `INSUFFICIENT_EVIDENCE` / `FAILED`. |
-| `summary.md` | Validity, coverage, teacher agreement, score histograms, and a per-bundle table with the facts next to the labels. |
+| `labels.jsonl` | Main-run labels from `qwen2.5:7b` and `mistral-nemo`. Per bundle × category × teacher: every sample (score + reason), a distribution over 0-10 (the soft target), the median, or `INSUFFICIENT_EVIDENCE` / `FAILED`. |
+| `labels.qwen3-14b.jsonl` | The same, from `qwen3:14b` on the same bundles. |
+| `summary.md` | Generated by `run`: validity, coverage, agreement and histograms for the main-run teachers. |
