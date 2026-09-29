@@ -5,13 +5,13 @@ not. The facts come from the scenario, but a bundle only counts as showing one w
 carrying it is ANSWERED or PARTIAL, since the labeller never sees the scenario. A gap in the right
 direction says a teacher reads that fact; it does not say the scores are right.
 
-    python -m datagen.check            # every labels*.jsonl in data/
+    python -m datagen.check                                  # every labels*.jsonl in data/
+    python -m datagen.check --data data/pilot2/distilabel    # another run's output
 """
+import argparse
 import json
 import statistics as st
 from pathlib import Path
-
-DATA = Path("data")
 
 
 def shown(b: dict, attribute: str) -> bool:
@@ -32,6 +32,9 @@ def facts(s: dict, b: dict) -> dict:
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--data", default="data")
+    DATA = Path(ap.parse_args().data)
     scen = {r["bundle_id"]: r for r in map(json.loads, (DATA / "scenarios.jsonl").open())}
     bundles = {bid: json.loads((DATA / "bundles" / f"{bid}.json").read_text()) for bid in scen}
     F = {bid: facts(scen[bid]["scenario"], bundles[bid]) for bid in scen}

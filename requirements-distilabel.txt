@@ -1,0 +1,2 @@
+distilabel==1.5.3  # the trial pipeline, datagen.distil_run; pulls in datasets, pyarrow, pydantic
+httpx

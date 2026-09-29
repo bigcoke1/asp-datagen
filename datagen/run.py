@@ -3,8 +3,9 @@
     python -m datagen.run --n 20 --categories identity containment
 
 Writes data/scenarios.jsonl (the facts, for audit only), data/bundles/*.json, data/labels.jsonl
-and data/summary.md. Rerunning with the same --seed and --out resumes: a bundle already written is
-not regenerated, and a label already written is not asked again.
+and data/summary.md, plus calls.jsonl and timing.md for where the time went. Rerunning with the same
+--seed and --out resumes: a bundle already written is not regenerated, and a label already written
+is not asked again. A resumed run's timing covers only the part it ran.
 """
 import argparse
 import json
@@ -14,11 +15,9 @@ import time
 from collections import Counter
 from pathlib import Path
 
-from datagen import assemble, generate, label, scenarios, validate
+from datagen import assemble, generate, label, llm, scenarios, timing, validate
 from datagen.contract import CATEGORIES
-from datagen.llm import TEACHERS
-
-GEN_MIX = {"qwen2.5:7b": 0.7, "mistral-nemo": 0.3}  # generation page §3.1: mix in a different teacher
+from datagen.llm import GEN_MIX, TEACHERS
 
 
 def read_jsonl(path: Path) -> list[dict]:
@@ -39,6 +38,8 @@ def main() -> None:
     scen_path, label_path = out / "scenarios.jsonl", out / "labels.jsonl"
     done_scen = {r["idx"]: r for r in read_jsonl(scen_path)}
     done_labels = {(r["bundle_id"], r["category"], r["teacher"]) for r in read_jsonl(label_path)}
+    llm.CALL_LOG = str(out / "calls.jsonl")
+    started = time.time()
 
     for idx in range(args.n):
         rng = random.Random(args.seed * 1000 + idx)
@@ -72,7 +73,12 @@ def main() -> None:
         print(f"[{idx:02d}] {b['bundle_id']} ctx {b['inputs_attempted'] and rec['scenario']['context']} "
               f"({time.time() - t0:.0f}s)", flush=True)
 
+    wall = time.time() - started
     summarize(out, args.categories)
+    timing.summarise(out, wall, args.n, {
+        "pipeline": "plain Python (datagen.run), one call at a time", "machine": timing.machine(list(TEACHERS)),
+        "settings": f"{len(args.categories)} categories, k={args.k} samples x {len(TEACHERS)} teachers"})
+    print(f"wrote {out / 'timing.md'}")
 
 
 def summarize(out: Path, categories: list[str]) -> None:

@@ -1,0 +1,279 @@
+{
+  "bundle_version": 1,
+  "bundle_id": "bnd-syn-0006-313416",
+  "host_id": "host-841bbcdd",
+  "sandbox_name": "intake-summarizer",
+  "collected_at": "2026-09-17T16:20:15Z",
+  "rule_pack_version": 15,
+  "inputs_attempted": {
+    "runtime": {
+      "attempted": true,
+      "reached": true,
+      "window_seconds": 1320
+    },
+    "image": {
+      "attempted": true,
+      "reached": false,
+      "reason": "NO_SOURCE_ACCESS"
+    },
+    "manifest": {
+      "attempted": false,
+      "reason": "NO_SOURCE_ACCESS"
+    },
+    "repo": {
+      "attempted": false,
+      "reason": "NOT_FIRST_PARTY"
+    }
+  },
+  "attributes": {
+    "deployment": {
+      "value": {
+        "RAIL_DEPLOYMENT": "sum-intake-v1-8-2",
+        "RAIL_NAMESPACE": "clinical-ai-ops"
+      },
+      "status": "ANSWERED",
+      "tier": "declared",
+      "authored_by": "platform",
+      "method": "container environment"
+    },
+    "image_digest": {
+      "value": "sha256:f6098b7d6ee8ec5fdbaf2a8bdcec9349d4a828cd7bb651460d23c46e47aae374",
+      "status": "ANSWERED",
+      "tier": "observed",
+      "authored_by": "none"
+    },
+    "harness_identity": {
+      "value": null,
+      "status": "BLIND",
+      "tier": "interrogated",
+      "reason": "NO_SOURCE_ACCESS",
+      "note": "no version endpoint answered"
+    },
+    "framework_identity": {
+      "value": null,
+      "status": "BLIND",
+      "tier": "declared",
+      "reason": "NO_SOURCE_ACCESS",
+      "note": "package manifest is in the image, which was not reached"
+    },
+    "model_name": {
+      "value": "med-llama-3-70b-instruct",
+      "status": "ANSWERED",
+      "tier": "observed",
+      "authored_by": "none"
+    },
+    "inference_endpoint": {
+      "value": null,
+      "status": "BLIND",
+      "tier": "observed",
+      "reason": "NO_SOURCE_ACCESS",
+      "note": "no model traffic in the 1320s window"
+    },
+    "mcp_servers_declared": {
+      "value": null,
+      "status": "BLIND",
+      "tier": "declared",
+      "reason": "CODE_CONSTRUCTED"
+    },
+    "mcp_servers_observed": {
+      "value": [
+        {
+          "endpoint": "medical-ontology-server.clinical-ai-ops.svc:7443",
+          "sessions": 1,
+          "transport": "http"
+        },
+        {
+          "endpoint": "patient-vault-mcp.clinical-ai-ops.svc:7443",
+          "sessions": 8,
+          "transport": "http"
+        }
+      ],
+      "status": "ANSWERED",
+      "tier": "observed",
+      "authored_by": "none"
+    },
+    "tool_names": {
+      "value": [
+        "nlp.clinical.extract_entities",
+        "doc.pdf.parse_text"
+      ],
+      "status": "PARTIAL",
+      "tier": "observed",
+      "authored_by": "none",
+      "method": "JSON-RPC frames seen during a 1320s window",
+      "note": "floor, not a count; tools not exercised in the window are absent here"
+    },
+    "tool_capability_envelope": {
+      "value": null,
+      "status": "BLIND",
+      "tier": "declared",
+      "reason": "NOT_FIRST_PARTY",
+      "note": "repo AST only (context E)"
+    },
+    "declared_destinations": {
+      "value": null,
+      "status": "BLIND",
+      "tier": "declared",
+      "reason": "PRIVATE_STORE"
+    },
+    "observed_destinations": {
+      "value": [
+        {
+          "host": "fhir-gateway.internal.healthcare.local",
+          "tls": true,
+          "peer_guess": "external"
+        },
+        {
+          "host": "clinical-notes-api.prod.cluster",
+          "tls": true,
+          "peer_guess": "external"
+        }
+      ],
+      "status": "ANSWERED",
+      "tier": "observed",
+      "authored_by": "none"
+    },
+    "undeclared_destinations": {
+      "value": null,
+      "status": "BLIND",
+      "tier": "declared",
+      "reason": "PRIVATE_STORE",
+      "note": "NOT COMPUTABLE: declared side is blind"
+    },
+    "credential_inventory": {
+      "value": null,
+      "status": "ABSENT",
+      "tier": "observed",
+      "reason": "SOURCE_OK_NOT_PRESENT",
+      "method": "scanned env, mounted files and image layers for credential shapes"
+    },
+    "credential_provenance": {
+      "value": null,
+      "status": "ABSENT",
+      "tier": "observed",
+      "method": "no credentials found to trace"
+    },
+    "in_layer_deleted_secrets": {
+      "value": null,
+      "status": "BLIND",
+      "tier": "observed",
+      "reason": "NO_SOURCE_ACCESS",
+      "note": "static-only; runtime cannot see image layers"
+    },
+    "mounts": {
+      "value": [
+        {
+          "source": "/mnt/clinical_data/intake_forms",
+          "target": "/data",
+          "mode": "ro"
+        },
+        {
+          "source": "tmpfs",
+          "target": "/tmp",
+          "mode": "rw"
+        }
+      ],
+      "status": "ANSWERED",
+      "tier": "observed",
+      "authored_by": "none",
+      "method": "container inspect"
+    },
+    "workdir": {
+      "value": "/app/runtime/summarizer",
+      "status": "ANSWERED",
+      "tier": "observed",
+      "authored_by": "none"
+    },
+    "user": {
+      "value": "1000:1000",
+      "status": "ANSWERED",
+      "tier": "observed",
+      "authored_by": "none"
+    },
+    "permissions": {
+      "value": {
+        "privileged": false,
+        "caps": [
+          "ALL"
+        ],
+        "root_fs": "read-write"
+      },
+      "status": "ANSWERED",
+      "tier": "observed",
+      "authored_by": "none",
+      "method": "container inspect HostConfig"
+    },
+    "approval_policy": {
+      "value": {
+        "destructive_requires_approval": false
+      },
+      "status": "ANSWERED",
+      "tier": "declared",
+      "authored_by": "subject",
+      "method": "harness config"
+    },
+    "tool_allow_deny": {
+      "value": {
+        "allow": [
+          "fhir.patient.get_record",
+          "nlp.clinical.extract_entities",
+          "doc.pdf.parse_text"
+        ],
+        "deny": []
+      },
+      "status": "ANSWERED",
+      "tier": "declared",
+      "authored_by": "subject",
+      "method": "harness config"
+    },
+    "sandbox_network_policy": {
+      "value": null,
+      "status": "BLIND",
+      "tier": "observed",
+      "reason": "NO_SOURCE_ACCESS"
+    },
+    "system_prompt_present": {
+      "value": true,
+      "status": "ANSWERED",
+      "tier": "observed",
+      "authored_by": "subject",
+      "note": "presence only"
+    },
+    "system_prompt_text": {
+      "value": null,
+      "status": "BLIND",
+      "tier": "observed",
+      "reason": "NOT_COLLECTED_BY_PACK"
+    },
+    "skills_inventory": {
+      "value": [
+        {
+          "name": "clinical-distillation",
+          "description": "We built this to strip out the noise and highlight only the critical symptoms and comorbidities for the doctor.",
+          "source_type": "skills_config",
+          "destination_endpoints": [
+            "clinical-notes-api.prod.cluster"
+          ]
+        },
+        {
+          "name": "patient-identity-verification",
+          "description": "Ensures the intake form matches the existing patient UUID in the FHIR server to prevent record mismatch.",
+          "source_type": "skills_config",
+          "destination_endpoints": [
+            "fhir-gateway.internal.healthcare.local"
+          ]
+        },
+        {
+          "name": "terminology-normalization",
+          "description": "Maps patient-friendly language to standardized SNOMED-CT codes for better searchability.",
+          "source_type": "skills_config",
+          "destination_endpoints": []
+        }
+      ],
+      "status": "ANSWERED",
+      "tier": "declared",
+      "authored_by": "subject",
+      "method": "SKILL.md frontmatter; skills constructed in code are not visible"
+    }
+  }
+}

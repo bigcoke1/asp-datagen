@@ -74,7 +74,7 @@ def prompt(s: dict) -> str:
 
 
 def surface(s: dict, teacher: str, seed: int) -> dict:
-    out = chat(teacher, SYSTEM, prompt(s), _schema(s), temperature=0.9, seed=seed)
+    out = chat(teacher, SYSTEM, prompt(s), _schema(s), temperature=0.9, seed=seed, stage="surface")
     if "_error" in out:
         raise RuntimeError(f"{teacher} returned no usable surface: {out['_error']}")
     return out

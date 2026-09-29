@@ -81,7 +81,7 @@ def label(bundle: dict, category: str, teacher: str, k: int, seed: int) -> dict:
         return {"outcome": "INSUFFICIENT_EVIDENCE", "missing": missing}
     samples = []
     for i in range(k):
-        out = chat(teacher, SYSTEM, ask(bundle, category), OUT, temperature=0.7, seed=seed + i)
+        out = chat(teacher, SYSTEM, ask(bundle, category), OUT, temperature=0.7, seed=seed + i, stage="label")
         score = out.get("score")
         ok = isinstance(score, int) and not isinstance(score, bool) and 0 <= score <= 10 and isinstance(out.get("reason"), str)
         samples.append({"score": score if ok else None, "reason": out.get("reason"), "valid": ok,

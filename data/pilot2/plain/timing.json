@@ -1,0 +1,79 @@
+{
+  "pipeline": "plain Python (datagen.run), one call at a time",
+  "machine": {
+    "chip": "Apple M4 Pro",
+    "memory_gb": 48,
+    "macos": "26.7",
+    "ollama": "0.33.3",
+    "models": {
+      "qwen3.8:27b": "27.3B Q4_K_M",
+      "gemma4:31b": "31.3B Q4_K_M"
+    }
+  },
+  "settings": "2 categories, k=3 samples x 2 teachers",
+  "wall_s": 5994.6,
+  "bundles": 20,
+  "calls": 212,
+  "llm_active_s": 5994.4,
+  "outside_llm_s": 0.2,
+  "s_per_bundle": 299.7,
+  "hours_per_1000_bundles": 83.3,
+  "stages": [
+    {
+      "stage": "surface",
+      "model": "qwen3.8:27b",
+      "calls": 15,
+      "errors": 0,
+      "active_s": 923.8,
+      "latency_median_s": 60.9,
+      "latency_p95_s": 77.1,
+      "prompt_s": 49.6,
+      "output_tokens": 4944,
+      "output_s": 790.1,
+      "model_loads": 15,
+      "load_s": 83.9
+    },
+    {
+      "stage": "label",
+      "model": "qwen3.8:27b",
+      "calls": 96,
+      "errors": 0,
+      "active_s": 2843.0,
+      "latency_median_s": 18.4,
+      "latency_p95_s": 58.1,
+      "prompt_s": 1160.1,
+      "output_tokens": 8640,
+      "output_s": 1591.9,
+      "model_loads": 17,
+      "load_s": 89.8
+    },
+    {
+      "stage": "label",
+      "model": "gemma4:31b",
+      "calls": 96,
+      "errors": 0,
+      "active_s": 2050.1,
+      "latency_median_s": 5.5,
+      "latency_p95_s": 57.9,
+      "prompt_s": 1430.7,
+      "output_tokens": 4980,
+      "output_s": 466.7,
+      "model_loads": 32,
+      "load_s": 151.4
+    },
+    {
+      "stage": "surface",
+      "model": "gemma4:31b",
+      "calls": 5,
+      "errors": 0,
+      "active_s": 177.5,
+      "latency_median_s": 40.3,
+      "latency_p95_s": 43.8,
+      "prompt_s": 20.1,
+      "output_tokens": 1756,
+      "output_s": 156.6,
+      "model_loads": 0,
+      "load_s": 0.0
+    }
+  ]
+}
